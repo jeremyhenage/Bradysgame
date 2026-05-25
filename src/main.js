@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
 import './style.css';
 
-const GAME_WIDTH = 480;
-const GAME_HEIGHT = 270;
-const WORLD_WIDTH = 2600;
-const GROUND_Y = 232;
+const GAME_WIDTH = 360;
+const GAME_HEIGHT = 202;
+const WORLD_WIDTH = 2250;
+const GROUND_Y = 174;
 const MAX_HEALTH = 6;
-const MOVE_SPEED = 154;
+const MOVE_SPEED = 130;
 
 const COLORS = {
   skyTop: 0x223f66,
@@ -31,30 +31,30 @@ class TitleScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#121622');
 
     this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x15283a).setOrigin(0);
-    for (let i = 0; i < 36; i += 1) {
-      const x = 250 + i * 10;
-      const y = 42 + (i % 5) * 12;
+    for (let i = 0; i < 30; i += 1) {
+      const x = 184 + i * 9;
+      const y = 32 + (i % 5) * 10;
       this.add.image(x, y, 'vineWall').setScale(1.5);
     }
-    this.add.image(188, 138, 'titleBrady').setScale(3);
-    this.add.image(278, 118, 'titleFire').setScale(3.4);
+    this.add.image(136, 112, 'titleBrady').setScale(3.2);
+    this.add.image(210, 96, 'titleFire').setScale(3.6);
 
-    this.add.text(16, 16, 'BRADY AND THE', {
+    this.add.text(12, 12, 'BRADY AND THE', {
       fontFamily: 'monospace',
-      fontSize: '20px',
+      fontSize: '16px',
       color: '#ffe98d',
       stroke: '#2b1730',
       strokeThickness: 4,
     });
-    this.add.text(16, 42, 'MAGICAL CAKE', {
+    this.add.text(12, 34, 'MAGICAL CAKE', {
       fontFamily: 'monospace',
-      fontSize: '32px',
+      fontSize: '25px',
       color: '#ff9ed1',
       stroke: '#2b1730',
       strokeThickness: 5,
     });
 
-    this.add.text(GAME_WIDTH / 2, 228, 'TAP OR PRESS SPACE', {
+    this.add.text(GAME_WIDTH / 2, 178, 'TAP OR PRESS SPACE', {
       fontFamily: 'monospace',
       fontSize: '14px',
       color: '#ffffff',
@@ -87,7 +87,7 @@ class GameScene extends Phaser.Scene {
 
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, GAME_HEIGHT);
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, GAME_HEIGHT);
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12, 0, 38);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12, 0, 22);
   }
 
   createWorld() {
@@ -102,7 +102,7 @@ class GameScene extends Phaser.Scene {
       this.add.rectangle(0, i * 18, WORLD_WIDTH, 18, Phaser.Display.Color.GetColor(shade.r, shade.g, shade.b)).setOrigin(0);
     }
     for (let x = 60; x < WORLD_WIDTH; x += 190) {
-      this.add.image(x, 188 + ((x / 190) % 2) * 8, 'tree').setScale(2).setAlpha(0.45);
+      this.add.image(x, 142 + ((x / 190) % 2) * 8, 'tree').setScale(1.9).setAlpha(0.45);
     }
 
     this.platforms = this.physics.add.staticGroup();
@@ -133,15 +133,15 @@ class GameScene extends Phaser.Scene {
       wall.destroy();
     });
 
-    let x = 180;
-    let y = 184;
+    let x = 145;
+    let y = 138;
     let platformIndex = 0;
     while (x < WORLD_WIDTH - 280) {
-      const width = Phaser.Math.Between(3, 6);
-      y = Phaser.Math.Clamp(y + Phaser.Math.Between(-42, 34), 96, 196);
+      const width = Phaser.Math.Between(3, 5);
+      y = Phaser.Math.Clamp(y + Phaser.Math.Between(-30, 24), 78, 148);
       this.addPlatform(x, y, width);
       this.decoratePlatform(x, y, width, platformIndex);
-      x += Phaser.Math.Between(185, 255);
+      x += Phaser.Math.Between(145, 205);
       platformIndex += 1;
     }
 
@@ -224,19 +224,19 @@ class GameScene extends Phaser.Scene {
 
     this.controlLayer = this.add.container(0, 0).setScrollFactor(0).setDepth(30);
     const controls = [
-      ['left', 48, 222, '<'],
-      ['right', 112, 222, '>'],
-      ['jump', 368, 222, '^'],
-      ['fire', 432, 222, '*'],
+      ['left', 38, 164, '<'],
+      ['right', 96, 164, '>'],
+      ['jump', 266, 164, '^'],
+      ['fire', 322, 164, '*'],
     ];
     controls.forEach(([name, x, y, label]) => {
-      const button = this.add.circle(x, y, 28, 0x0d1320, 0.58).setStrokeStyle(2, 0xffffff, 0.75);
+      const button = this.add.circle(x, y, 25, 0x0d1320, 0.62).setStrokeStyle(2, 0xffffff, 0.8);
       const text = this.add.text(x, y - 2, label, {
         fontFamily: 'monospace',
         fontSize: '18px',
         color: '#ffffff',
       }).setOrigin(0.5);
-      button.setInteractive(new Phaser.Geom.Circle(28, 28, 36), Phaser.Geom.Circle.Contains);
+      button.setInteractive(new Phaser.Geom.Circle(25, 25, 34), Phaser.Geom.Circle.Contains);
       button.on('pointerdown', (pointer) => {
         pointer.event?.preventDefault?.();
         this.mobileInput[name] = true;
@@ -272,7 +272,7 @@ class GameScene extends Phaser.Scene {
     }
 
     if (jump && this.player.body.blocked.down) {
-      this.player.setVelocityY(-286);
+      this.player.setVelocityY(-252);
     }
 
     if (fire && this.fireMode && time - this.lastFireAt > 280) {
@@ -330,9 +330,9 @@ class GameScene extends Phaser.Scene {
       if (!pointer?.isDown) return;
       const x = pointer.x;
       const y = pointer.y;
-      if (y < GAME_HEIGHT - 84) return;
-      if (x < 82) held.left = true;
-      if (x >= 82 && x < 168) held.right = true;
+      if (y < GAME_HEIGHT - 70) return;
+      if (x < 70) held.left = true;
+      if (x >= 70 && x < 140) held.right = true;
     });
 
     this.mobileInput.left = held.left;
@@ -398,15 +398,15 @@ class EndScene extends Phaser.Scene {
 
   create(data) {
     this.cameras.main.setBackgroundColor(data.won ? '#183926' : '#331a24');
-    this.add.text(GAME_WIDTH / 2, 82, data.won ? 'CAKE FOUND!' : 'TRY AGAIN', {
+    this.add.text(GAME_WIDTH / 2, 56, data.won ? 'CAKE FOUND!' : 'TRY AGAIN', {
       fontFamily: 'monospace',
-      fontSize: '30px',
+      fontSize: '25px',
       color: data.won ? '#ffe88a' : '#ff9bad',
       stroke: '#101018',
       strokeThickness: 5,
     }).setOrigin(0.5);
-    this.add.image(GAME_WIDTH / 2, 142, data.won ? 'goalCake' : 'brady').setScale(data.won ? 2 : 3);
-    this.add.text(GAME_WIDTH / 2, 224, 'TAP OR PRESS SPACE', {
+    this.add.image(GAME_WIDTH / 2, 110, data.won ? 'goalCake' : 'brady').setScale(data.won ? 2.4 : 3.4);
+    this.add.text(GAME_WIDTH / 2, 172, 'TAP OR PRESS SPACE', {
       fontFamily: 'monospace',
       fontSize: '14px',
       color: '#ffffff',
@@ -547,7 +547,7 @@ const config = {
   physics: {
     default: 'arcade',
     arcade: {
-      gravity: { y: 720 },
+      gravity: { y: 660 },
       debug: false,
     },
   },
