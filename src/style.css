@@ -35,3 +35,10 @@ canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
+
+@media (hover: hover) and (pointer: fine) {
+  canvas {
+    max-width: min(100vw, 960px);
+    max-height: min(100dvh, 540px);
+  }
+}

@@ -7,6 +7,7 @@ const WORLD_WIDTH = 2250;
 const GROUND_Y = 174;
 const MAX_HEALTH = 6;
 const MOVE_SPEED = 130;
+const ACTOR_SCALE = 1.22;
 
 const COLORS = {
   skyTop: 0x223f66,
@@ -78,6 +79,7 @@ class GameScene extends Phaser.Scene {
     this.invincibleUntil = 0;
     this.lastDamageAt = 0;
     this.lastFireAt = 0;
+    this.pits = [];
     this.mobileInput = { left: false, right: false, jump: false, fire: false };
 
     this.createWorld();
@@ -105,6 +107,12 @@ class GameScene extends Phaser.Scene {
       this.add.image(x, 142 + ((x / 190) % 2) * 8, 'tree').setScale(1.9).setAlpha(0.45);
     }
 
+    this.pits = this.createPits();
+    this.pits.forEach((pit) => {
+      this.add.rectangle((pit.start + pit.end) / 2, GROUND_Y + 28, pit.end - pit.start, 24, 0x182139).setAlpha(0.82);
+      this.add.rectangle((pit.start + pit.end) / 2, GROUND_Y + 9, pit.end - pit.start, 3, 0x6fc3df).setAlpha(0.65);
+    });
+
     this.platforms = this.physics.add.staticGroup();
     this.hazards = this.physics.add.group();
     this.birds = this.physics.add.group({ allowGravity: false });
@@ -113,12 +121,15 @@ class GameScene extends Phaser.Scene {
     this.walls = this.physics.add.staticGroup();
 
     for (let x = 0; x < WORLD_WIDTH; x += 32) {
-      this.platforms.create(x + 16, GROUND_Y + 16, 'groundTile');
+      if (!this.isInPit(x + 16)) {
+        this.platforms.create(x + 16, GROUND_Y + 16, 'groundTile');
+      }
     }
   }
 
   createLevel() {
     this.player = this.physics.add.sprite(42, GROUND_Y - 28, 'brady');
+    this.player.setScale(ACTOR_SCALE);
     this.player.setCollideWorldBounds(true);
     this.player.setDragX(0);
     this.player.setMaxVelocity(MOVE_SPEED, 420);
@@ -133,19 +144,9 @@ class GameScene extends Phaser.Scene {
       wall.destroy();
     });
 
-    let x = 145;
-    let y = 138;
-    let platformIndex = 0;
-    while (x < WORLD_WIDTH - 280) {
-      const width = Phaser.Math.Between(3, 5);
-      y = Phaser.Math.Clamp(y + Phaser.Math.Between(-30, 24), 78, 148);
-      this.addPlatform(x, y, width);
-      this.decoratePlatform(x, y, width, platformIndex);
-      x += Phaser.Math.Between(145, 205);
-      platformIndex += 1;
-    }
+    this.buildInterestingLevel();
 
-    this.goal = this.physics.add.staticSprite(WORLD_WIDTH - 100, GROUND_Y - 34, 'goalCake').setScale(1.5);
+    this.goal = this.physics.add.staticSprite(WORLD_WIDTH - 100, GROUND_Y - 36, 'goalCake').setScale(1.7);
     this.physics.add.overlap(this.player, this.goal, () => this.finish(true));
 
     this.physics.add.overlap(this.player, this.hazards, (_, hazard) => this.damage(hazard));
@@ -161,43 +162,114 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  createPits() {
+    const pits = [];
+    let x = 340;
+    while (x < WORLD_WIDTH - 330) {
+      const width = Phaser.Math.Between(76, 118);
+      pits.push({ start: x, end: x + width });
+      x += Phaser.Math.Between(390, 520);
+    }
+    return pits;
+  }
+
+  isInPit(x) {
+    return this.pits.some((pit) => x > pit.start && x < pit.end);
+  }
+
+  buildInterestingLevel() {
+    let index = 0;
+    const add = (x, y, width, type = 'normal') => {
+      this.addPlatform(x, y, width);
+      this.decoratePlatform(x, y, width, index, type);
+      index += 1;
+    };
+
+    add(128, 138, 4, 'warmup');
+    add(230, 116, 3, 'potion');
+
+    this.pits.forEach((pit, pitIndex) => {
+      const bridgeY = Phaser.Math.Between(116, 142);
+      add(pit.start - 36, GROUND_Y - 26, 2, 'snake');
+      add(pit.start + 22, bridgeY, 3, pitIndex % 2 === 0 ? 'bird' : 'fire');
+      add(pit.end - 20, bridgeY - Phaser.Math.Between(18, 28), 3, 'pickup');
+      add(pit.end + 42, GROUND_Y - 36, 3, pitIndex % 2 === 0 ? 'vine' : 'snake');
+    });
+
+    let x = 520;
+    while (x < WORLD_WIDTH - 360) {
+      const pattern = Phaser.Math.Between(0, 3);
+      if (pattern === 0) {
+        add(x, 126, 3, 'bird');
+        add(x + 94, 100, 3, 'pickup');
+        add(x + 184, 132, 4, 'snake');
+      } else if (pattern === 1) {
+        add(x, 146, 3, 'fire');
+        add(x + 82, 120, 3, 'normal');
+        add(x + 162, 94, 3, 'bird');
+      } else if (pattern === 2) {
+        add(x, 108, 5, 'vine');
+        add(x + 156, 138, 3, 'pickup');
+      } else {
+        add(x, 144, 2, 'snake');
+        add(x + 70, 118, 2, 'normal');
+        add(x + 140, 92, 3, 'bird');
+        add(x + 230, 132, 4, 'fire');
+      }
+      x += Phaser.Math.Between(260, 360);
+    }
+  }
+
   addPlatform(x, y, width) {
     for (let i = 0; i < width; i += 1) {
       this.platforms.create(x + i * 32, y, 'platformTile');
     }
   }
 
-  decoratePlatform(x, y, width, index) {
+  decoratePlatform(x, y, width, index, type = 'normal') {
     const center = x + ((width - 1) * 16);
-    if (index % 2 === 0) {
-      const snake = this.hazards.create(center, y - 20, 'snake');
-      snake.setData('kind', 'snake');
-      snake.setVelocityX(index % 4 === 0 ? 42 : -42);
-      snake.setBounce(1, 0);
-      snake.setCollideWorldBounds(false);
+    if (type === 'snake' || (type === 'normal' && index % 4 === 0)) {
+      this.createSnake(center, y - 18, index);
     }
-    if (index % 3 === 0) {
-      this.pickups.create(x + 18, y - 28, 'potion').setData('kind', 'potion');
+    if (type === 'potion' || index % 6 === 0) {
+      this.pickups.create(x + 18, y - 30, 'potion').setScale(1.16).setData('kind', 'potion');
     }
-    if (index === 2 || index === 6) {
-      this.pickups.create(center, y - 32, 'fireCake').setData('kind', 'fire');
+    if (type === 'pickup' || index === 2 || index === 9) {
+      this.pickups.create(center, y - 34, 'fireCake').setScale(1.18).setData('kind', 'fire');
     }
-    if (index === 4) {
-      this.pickups.create(center, y - 34, 'starCake').setData('kind', 'invincible');
+    if (index === 5 || index === 13) {
+      this.pickups.create(center, y - 36, 'starCake').setScale(1.18).setData('kind', 'invincible');
     }
-    if (index % 5 === 1) {
-      const bird = this.birds.create(center + 76, y - 78, 'bird');
-      bird.setData('originX', bird.x);
-      bird.setData('originY', bird.y);
-      bird.setData('phase', Math.random() * Math.PI * 2);
-      bird.setVelocityX(index % 2 ? -48 : 48);
+    if (type === 'bird' || index % 7 === 1) {
+      this.createBird(center + 74, y - 72, index);
     }
-    if (index % 4 === 3) {
-      this.hazards.create(x + 10, y - 18, 'fireHazard').setData('kind', 'fire');
+    if (type === 'fire' || index % 7 === 3) {
+      this.hazards.create(x + 10, y - 20, 'fireHazard').setScale(1.18).setData('kind', 'fire');
     }
-    if (index === 5 || index === 8) {
+    if (type === 'vine' || index === 8 || index === 14) {
       this.walls.create(x + width * 32 + 42, y - 24, 'vineWall');
     }
+  }
+
+  createSnake(x, y, index) {
+    const snake = this.hazards.create(x, y, 'snake');
+    snake.setScale(1.18);
+    snake.setData('kind', 'snake');
+    snake.setVelocityX(index % 4 === 0 ? 44 : -44);
+    snake.setBounce(1, 0);
+    snake.setCollideWorldBounds(false);
+  }
+
+  createBird(x, y, index) {
+    const bird = this.birds.create(x, y, 'bird');
+    bird.setScale(1.18);
+    bird.setData('kind', 'bird');
+    bird.setData('originX', bird.x);
+    bird.setData('originY', bird.y);
+    bird.setData('phase', Math.random() * Math.PI * 2);
+    bird.setData('mode', 'patrol');
+    bird.setData('nextDiveAt', this.time.now + Phaser.Math.Between(1800, 4600));
+    bird.setVelocityX(index % 2 ? -42 : 42);
   }
 
   createHud() {
@@ -220,7 +292,7 @@ class GameScene extends Phaser.Scene {
 
   createControls() {
     this.cursors = this.input.keyboard?.createCursorKeys();
-    this.keys = this.input.keyboard?.addKeys('A,D,SPACE,ENTER');
+    this.keys = this.input.keyboard?.addKeys('A,D,SPACE,ENTER,UP');
 
     this.controlLayer = this.add.container(0, 0).setScrollFactor(0).setDepth(30);
     const controls = [
@@ -257,7 +329,7 @@ class GameScene extends Phaser.Scene {
     const left = this.cursors?.left.isDown || this.keys?.A.isDown || this.mobileInput.left;
     const right = this.cursors?.right.isDown || this.keys?.D.isDown || this.mobileInput.right;
     const jump = Phaser.Input.Keyboard.JustDown(this.cursors?.space) || Phaser.Input.Keyboard.JustDown(this.keys?.SPACE) || this.consumeMobile('jump');
-    const fire = Phaser.Input.Keyboard.JustDown(this.keys?.ENTER) || this.consumeMobile('fire');
+    const fire = Phaser.Input.Keyboard.JustDown(this.keys?.ENTER) || Phaser.Input.Keyboard.JustDown(this.keys?.UP) || this.consumeMobile('fire');
 
     if (left) {
       this.player.setVelocityX(-MOVE_SPEED);
@@ -288,13 +360,7 @@ class GameScene extends Phaser.Scene {
 
     this.birds.children.iterate((bird) => {
       if (!bird?.active) return;
-      const originX = bird.getData('originX');
-      const phase = bird.getData('phase');
-      bird.y = bird.getData('originY') + Math.sin(time / 350 + phase) * 14;
-      if (Math.abs(bird.x - originX) > 92) {
-        bird.setVelocityX(-bird.body.velocity.x);
-        bird.setFlipX(bird.body.velocity.x < 0);
-      }
+      this.updateBird(bird, time);
     });
 
     if (this.player.y > GAME_HEIGHT + 60) {
@@ -302,6 +368,44 @@ class GameScene extends Phaser.Scene {
     }
 
     this.updateHud(time);
+  }
+
+  updateBird(bird, time) {
+    const mode = bird.getData('mode');
+    const originX = bird.getData('originX');
+    const originY = bird.getData('originY');
+    const phase = bird.getData('phase');
+
+    if (mode === 'dive') {
+      if (bird.y > Math.min(GROUND_Y - 22, this.player.y + 12) || time > bird.getData('diveEndsAt')) {
+        bird.setData('mode', 'recover');
+        bird.setVelocity((originX - bird.x) * 1.6, -96);
+      }
+      bird.setFlipX(bird.body.velocity.x < 0);
+      return;
+    }
+
+    if (mode === 'recover') {
+      if (Phaser.Math.Distance.Between(bird.x, bird.y, originX, originY) < 18 || time > bird.getData('recoverEndsAt')) {
+        bird.setData('mode', 'patrol');
+        bird.setData('nextDiveAt', time + Phaser.Math.Between(2600, 5600));
+        bird.setVelocityX(bird.x < this.player.x ? 42 : -42);
+      }
+      bird.setFlipX(bird.body.velocity.x < 0);
+      return;
+    }
+
+    bird.y = originY + Math.sin(time / 320 + phase) * 10;
+    if (Math.abs(bird.x - originX) > 86) {
+      bird.setVelocityX(-bird.body.velocity.x);
+    }
+    if (time > bird.getData('nextDiveAt') && Math.abs(this.player.x - bird.x) < 155) {
+      bird.setData('mode', 'dive');
+      bird.setData('diveEndsAt', time + 900);
+      bird.setData('recoverEndsAt', time + 1900);
+      this.physics.moveToObject(bird, this.player, 150);
+    }
+    bird.setFlipX(bird.body.velocity.x < 0);
   }
 
   consumeMobile(name) {
@@ -460,10 +564,27 @@ function makeTextures(scene) {
     ctx.fillRect(15, 4, 5, 5);
     ctx.fillStyle = '#ffdf58'; ctx.fillRect(18, 5, 1, 1);
   });
-  drawTexture(scene, 'bird', 22, 14, (ctx) => {
-    ctx.fillStyle = '#6a3fa0'; ctx.fillRect(8, 5, 8, 5);
-    ctx.fillStyle = '#9d6be0'; ctx.fillRect(1, 2, 8, 4); ctx.fillRect(14, 2, 7, 4);
-    ctx.fillStyle = '#f5c84b'; ctx.fillRect(16, 6, 4, 2);
+  drawTexture(scene, 'bird', 34, 24, (ctx) => {
+    ctx.fillStyle = '#25184f';
+    ctx.fillRect(13, 8, 10, 8);
+    ctx.fillRect(20, 6, 5, 6);
+    ctx.fillStyle = '#6c4bc4';
+    ctx.fillRect(3, 7, 10, 5);
+    ctx.fillRect(1, 10, 14, 4);
+    ctx.fillRect(22, 7, 9, 5);
+    ctx.fillRect(23, 10, 10, 4);
+    ctx.fillStyle = '#a98cff';
+    ctx.fillRect(6, 5, 7, 3);
+    ctx.fillRect(24, 5, 6, 3);
+    ctx.fillStyle = '#f5c84b';
+    ctx.fillRect(25, 10, 6, 3);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(22, 8, 2, 2);
+    ctx.fillStyle = '#101018';
+    ctx.fillRect(23, 9, 1, 1);
+    ctx.fillStyle = '#1c123d';
+    ctx.fillRect(14, 16, 3, 4);
+    ctx.fillRect(20, 16, 3, 4);
   });
   drawTexture(scene, 'fireHazard', 18, 18, (ctx) => {
     ctx.fillStyle = '#d32f21'; ctx.fillRect(5, 7, 9, 9);
