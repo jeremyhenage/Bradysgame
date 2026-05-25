@@ -8,6 +8,7 @@ body {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 #game {
@@ -21,6 +22,7 @@ body {
 
 canvas {
   display: block;
+  touch-action: none;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }

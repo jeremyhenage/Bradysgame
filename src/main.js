@@ -6,6 +6,7 @@ const GAME_HEIGHT = 270;
 const WORLD_WIDTH = 2600;
 const GROUND_Y = 232;
 const MAX_HEALTH = 6;
+const MOVE_SPEED = 154;
 
 const COLORS = {
   skyTop: 0x223f66,
@@ -119,8 +120,8 @@ class GameScene extends Phaser.Scene {
   createLevel() {
     this.player = this.physics.add.sprite(42, GROUND_Y - 28, 'brady');
     this.player.setCollideWorldBounds(true);
-    this.player.setDragX(900);
-    this.player.setMaxVelocity(180, 420);
+    this.player.setDragX(0);
+    this.player.setMaxVelocity(MOVE_SPEED, 420);
     this.player.facing = 1;
 
     this.physics.add.collider(this.player, this.platforms);
@@ -229,36 +230,45 @@ class GameScene extends Phaser.Scene {
       ['fire', 432, 222, '*'],
     ];
     controls.forEach(([name, x, y, label]) => {
-      const button = this.add.circle(x, y, 24, 0x0d1320, 0.58).setStrokeStyle(2, 0xffffff, 0.75);
+      const button = this.add.circle(x, y, 28, 0x0d1320, 0.58).setStrokeStyle(2, 0xffffff, 0.75);
       const text = this.add.text(x, y - 2, label, {
         fontFamily: 'monospace',
         fontSize: '18px',
         color: '#ffffff',
       }).setOrigin(0.5);
-      button.setInteractive();
-      button.on('pointerdown', () => { this.mobileInput[name] = true; });
+      button.setInteractive(new Phaser.Geom.Circle(28, 28, 36), Phaser.Geom.Circle.Contains);
+      button.on('pointerdown', (pointer) => {
+        pointer.event?.preventDefault?.();
+        this.mobileInput[name] = true;
+      });
       button.on('pointerup', () => { this.mobileInput[name] = false; });
-      button.on('pointerout', () => { this.mobileInput[name] = false; });
+      button.on('pointerupoutside', () => { this.mobileInput[name] = false; });
       this.controlLayer.add([button, text]);
     });
+
+    this.input.addPointer(3);
+    this.input.on('pointerup', () => this.releaseActionButtons());
+    this.input.on('pointercancel', () => this.releaseActionButtons());
+    window.addEventListener('blur', () => this.resetMobileInput(), { passive: true });
   }
 
   update(time) {
+    this.syncHeldTouchMovement();
     const left = this.cursors?.left.isDown || this.keys?.A.isDown || this.mobileInput.left;
     const right = this.cursors?.right.isDown || this.keys?.D.isDown || this.mobileInput.right;
     const jump = Phaser.Input.Keyboard.JustDown(this.cursors?.space) || Phaser.Input.Keyboard.JustDown(this.keys?.SPACE) || this.consumeMobile('jump');
     const fire = Phaser.Input.Keyboard.JustDown(this.keys?.ENTER) || this.consumeMobile('fire');
 
     if (left) {
-      this.player.setAccelerationX(-540);
+      this.player.setVelocityX(-MOVE_SPEED);
       this.player.facing = -1;
       this.player.setFlipX(true);
     } else if (right) {
-      this.player.setAccelerationX(540);
+      this.player.setVelocityX(MOVE_SPEED);
       this.player.facing = 1;
       this.player.setFlipX(false);
     } else {
-      this.player.setAccelerationX(0);
+      this.player.setVelocityX(0);
     }
 
     if (jump && this.player.body.blocked.down) {
@@ -298,6 +308,35 @@ class GameScene extends Phaser.Scene {
     if (!this.mobileInput[name]) return false;
     this.mobileInput[name] = false;
     return true;
+  }
+
+  releaseActionButtons() {
+    this.mobileInput.jump = false;
+    this.mobileInput.fire = false;
+  }
+
+  resetMobileInput() {
+    this.mobileInput = { left: false, right: false, jump: false, fire: false };
+  }
+
+  syncHeldTouchMovement() {
+    const pointers = [this.input.activePointer, ...this.input.manager.pointers];
+    const held = {
+      left: false,
+      right: false,
+    };
+
+    pointers.forEach((pointer) => {
+      if (!pointer?.isDown) return;
+      const x = pointer.x;
+      const y = pointer.y;
+      if (y < GAME_HEIGHT - 84) return;
+      if (x < 82) held.left = true;
+      if (x >= 82 && x < 168) held.right = true;
+    });
+
+    this.mobileInput.left = held.left;
+    this.mobileInput.right = held.right;
   }
 
   shootFireball() {
